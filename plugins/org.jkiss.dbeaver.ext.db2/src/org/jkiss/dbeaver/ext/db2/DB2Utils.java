@@ -29,6 +29,7 @@ import org.jkiss.dbeaver.ext.db2.model.dict.DB2TablespaceDataType;
 import org.jkiss.dbeaver.ext.db2.model.fed.DB2Nickname;
 import org.jkiss.dbeaver.ext.db2.model.module.DB2Module;
 import org.jkiss.dbeaver.model.DBPEvaluationContext;
+import org.jkiss.dbeaver.model.DBPScriptObject;
 import org.jkiss.dbeaver.model.DBUtils;
 import org.jkiss.dbeaver.model.exec.DBCException;
 import org.jkiss.dbeaver.model.exec.jdbc.JDBCCallableStatement;
@@ -40,12 +41,15 @@ import org.jkiss.dbeaver.model.runtime.DBRProgressMonitor;
 import org.jkiss.dbeaver.model.runtime.VoidProgressMonitor;
 import org.jkiss.dbeaver.model.sql.SQLConstants;
 import org.jkiss.dbeaver.model.sql.format.SQLFormatUtils;
+import org.jkiss.dbeaver.model.struct.DBStructUtils;
 import org.jkiss.utils.CommonUtils;
 
 import java.sql.Clob;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * DB2 Utils
@@ -211,7 +215,17 @@ public class DB2Utils {
             return sb.toString();
 
         } catch (SQLException e) {
-            throw new DBDatabaseException(e, dataSource);
+            log.warn("Failed to generate DDL using DB2LK_GENERATE_DDL, falling back to generic DDL generation: " + e.getMessage());
+            try {
+                Map<String, Object> fallbackOptions = new LinkedHashMap<>();
+                fallbackOptions.put(DBPScriptObject.OPTION_INCLUDE_NESTED_OBJECTS, true);
+                fallbackOptions.put(DBPScriptObject.OPTION_INCLUDE_COMMENTS, true);
+                fallbackOptions.put(DBPScriptObject.OPTION_INCLUDE_PERMISSIONS, true);
+                fallbackOptions.put(DBPScriptObject.OPTION_INCLUDE_PARTITIONS, true);
+                return DBStructUtils.generateTableDDL(monitor, db2Table, fallbackOptions, false);
+            } catch (DBException ex) {
+                throw new DBDatabaseException(e, dataSource);
+            }
         } finally {
             monitor.done();
         }

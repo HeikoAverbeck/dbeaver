@@ -41,7 +41,7 @@ public abstract class CopilotClientBase<REQUEST extends Object, RESPONSE extends
     protected static final String DBEAVER_OAUTH_APP = "Iv1.b507a08c87ecfe98";
     protected static final Duration TIMEOUT = Duration.ofSeconds(30);
     private static final Log log = Log.getLog(CopilotClientBase.class);
-    private static final String COPILOT_CHAT_MODELS_URL = "https://api.githubcopilot.com/models";
+    private static final String COPILOT_MODELS_PATH = "/models";
     private static final String EDITOR_VERSION = "Neovim/0.6.1"; // TODO replace after partnership
     private static final String EDITOR_PLUGIN_VERSION = "copilot.vim/1.16.0"; // TODO replace after partnership
     private static final String USER_AGENT = "GithubCopilot/1.155.0";
@@ -87,7 +87,7 @@ public abstract class CopilotClientBase<REQUEST extends Object, RESPONSE extends
     @NotNull
     public CopilotClientChat.DeviceCodeResponse requestDeviceCode(@NotNull DBRProgressMonitor monitor) throws DBException {
         DeviceCodeRequest deviceCodeRequest = new DeviceCodeRequest(DBEAVER_OAUTH_APP, "read:user");
-        HttpRequest request = HttpRequest.newBuilder().uri(AIHttpUtils.resolve("https://github.com/login/device/code"))
+        HttpRequest request = HttpRequest.newBuilder().uri(AIHttpUtils.resolve("https://lmt-de.ghe.com/login/device/code"))
             .header("accept", HttpConstants.CONTENT_TYPE_JSON).header(HttpConstants.HEADER_CONTENT_TYPE, HttpConstants.CONTENT_TYPE_JSON)
             .timeout(Duration.ofSeconds(10)) // Set timeout
             .POST(HttpRequest.BodyPublishers.ofString(CopilotUtils.GSON.toJson(deviceCodeRequest))).build();
@@ -98,14 +98,15 @@ public abstract class CopilotClientBase<REQUEST extends Object, RESPONSE extends
     /**
      * Loads a list of available Copilot models from the server.
      *
-     * @param monitor the progress monitor to track the request's progress and handle cancellation
-     * @param token   the authorization token used to authenticate the request
+     * @param monitor    the progress monitor to track the request's progress and handle cancellation
+     * @param token      the authorization token used to authenticate the request
+     * @param apiBaseUrl the base URL for the Copilot API (from session token endpoints)
      * @return a list of {@code CopilotModel} objects representing the enabled models
      * @throws DBException if the request fails
      */
     @NotNull
-    public List<CopilotModel> loadModels(@NotNull DBRProgressMonitor monitor, @NotNull String token) throws DBException {
-        HttpRequest request = HttpRequest.newBuilder().uri(AIHttpUtils.resolve(COPILOT_CHAT_MODELS_URL))
+    public List<CopilotModel> loadModels(@NotNull DBRProgressMonitor monitor, @NotNull String token, @NotNull String apiBaseUrl) throws DBException {
+        HttpRequest request = HttpRequest.newBuilder().uri(AIHttpUtils.resolve(apiBaseUrl + COPILOT_MODELS_PATH))
             .header(HttpConstants.HEADER_CONTENT_TYPE, HttpConstants.CONTENT_TYPE_JSON)
             .header(HttpConstants.HEADER_AUTHORIZATION, "Bearer " + token).header("Editor-Version", CHAT_EDITOR_VERSION).GET()
             .timeout(TIMEOUT).build();
@@ -129,7 +130,7 @@ public abstract class CopilotClientBase<REQUEST extends Object, RESPONSE extends
             deviceCodeResponse.deviceCode(),
             "urn:ietf:params:oauth:grant-type:device_code"
         );
-        HttpRequest request = HttpRequest.newBuilder().uri(AIHttpUtils.resolve("https://github.com/login/oauth/access_token"))
+        HttpRequest request = HttpRequest.newBuilder().uri(AIHttpUtils.resolve("https://lmt-de.ghe.com/login/oauth/access_token"))
             .header("accept", HttpConstants.CONTENT_TYPE_JSON).header(HttpConstants.HEADER_CONTENT_TYPE, HttpConstants.CONTENT_TYPE_JSON)
             .timeout(Duration.ofSeconds(5)) // Set timeout
             .POST(HttpRequest.BodyPublishers.ofString(CopilotUtils.GSON.toJson(accessTokenRequest))).build();

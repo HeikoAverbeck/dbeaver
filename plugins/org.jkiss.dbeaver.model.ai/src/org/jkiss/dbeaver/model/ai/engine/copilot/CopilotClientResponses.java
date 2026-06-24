@@ -49,7 +49,7 @@ import java.util.stream.Stream;
 public class CopilotClientResponses extends CopilotClientBase<Pair<OAIResponsesRequest, CopilotChatRequest>, Object> {
     private static final Log log = Log.getLog(CopilotClientResponses.class);
     private static final Set<String> MODELS_WITHOUT_TEMPERATURE = new HashSet<>();
-    private static final String CHAT_REQUEST_URL = "https://api.githubcopilot.com/v1/responses";
+    private static final String RESPONSES_PATH = "/v1/responses";
 
     private final CopilotClientChat backupClient;
 
@@ -65,9 +65,9 @@ public class CopilotClientResponses extends CopilotClientBase<Pair<OAIResponsesR
     }
 
     @NotNull
-    public List<OAIModel> getModels(@NotNull DBRProgressMonitor monitor) throws DBException {
+    public List<OAIModel> getModels(@NotNull DBRProgressMonitor monitor, @NotNull String apiBaseUrl) throws DBException {
         HttpRequest request = HttpRequest.newBuilder()
-            .uri(AIHttpUtils.resolve(CHAT_REQUEST_URL, "models"))
+            .uri(AIHttpUtils.resolve(apiBaseUrl + RESPONSES_PATH, "models"))
             .GET()
             .timeout(TIMEOUT)
             .build();
@@ -76,12 +76,12 @@ public class CopilotClientResponses extends CopilotClientBase<Pair<OAIResponsesR
     }
 
     @NotNull
-    private HttpRequest createCompletionRequest(@NotNull OAIResponsesRequest completionRequest, @NotNull String token) throws DBException {
+    private HttpRequest createCompletionRequest(@NotNull OAIResponsesRequest completionRequest, @NotNull String token, @NotNull String apiBaseUrl) throws DBException {
         if (completionRequest.model != null && MODELS_WITHOUT_TEMPERATURE.contains(completionRequest.model)) {
             completionRequest.temperature = null;
         }
         return HttpRequest.newBuilder()
-            .uri(AIHttpUtils.resolve(CHAT_REQUEST_URL))
+            .uri(AIHttpUtils.resolve(apiBaseUrl + RESPONSES_PATH))
             .header(HttpConstants.HEADER_AUTHORIZATION, "Bearer " + token)
             .header(HttpConstants.HEADER_CONTENT_TYPE, HttpConstants.CONTENT_TYPE_JSON)
             .header("Editor-Version", CHAT_EDITOR_VERSION)
@@ -96,13 +96,23 @@ public class CopilotClientResponses extends CopilotClientBase<Pair<OAIResponsesR
         @NotNull String token,
         @NotNull Pair<OAIResponsesRequest, CopilotChatRequest> chatRequest
     ) throws DBException {
-        HttpRequest request = createCompletionRequest(chatRequest.getFirst(), token);
+        return chat(monitor, token, chatRequest, "https://api.githubcopilot.com");
+    }
+
+    @NotNull
+    public Object chat(
+        @NotNull DBRProgressMonitor monitor,
+        @NotNull String token,
+        @NotNull Pair<OAIResponsesRequest, CopilotChatRequest> chatRequest,
+        @NotNull String apiBaseUrl
+    ) throws DBException {
+        HttpRequest request = createCompletionRequest(chatRequest.getFirst(), token, apiBaseUrl);
         try {
             String responseJson = client.send(monitor, request);
             return CopilotUtils.GSON.fromJson(responseJson, OAIResponsesResponse.class);
         } catch (DBException e) {
             if (e.getMessage() != null && e.getMessage().contains("is not supported via Responses API")) {
-                return backupClient.chat(monitor, token, chatRequest.getSecond());
+                return backupClient.chat(monitor, token, chatRequest.getSecond(), apiBaseUrl);
             } else {
                 log.error("Error in chat request, falling back to legacy client", e);
                 throw e;
@@ -116,8 +126,18 @@ public class CopilotClientResponses extends CopilotClientBase<Pair<OAIResponsesR
         @NotNull Pair<OAIResponsesRequest, CopilotChatRequest> chatRequest,
         @NotNull AIEngineResponseConsumer listener
     ) throws DBException {
+        createChatCompletionStream(monitor, token, chatRequest, listener, "https://api.githubcopilot.com");
+    }
+
+    public void createChatCompletionStream(
+        @NotNull DBRProgressMonitor monitor,
+        @NotNull String token,
+        @NotNull Pair<OAIResponsesRequest, CopilotChatRequest> chatRequest,
+        @NotNull AIEngineResponseConsumer listener,
+        @NotNull String apiBaseUrl
+    ) throws DBException {
         chatRequest.getFirst().stream = true;
-        HttpRequest request = createCompletionRequest(chatRequest.getFirst(), token);
+        HttpRequest request = createCompletionRequest(chatRequest.getFirst(), token, apiBaseUrl);
 
         Consumer<String> stringConsumer = new OpenAiAPIStreamConsumer(listener);
         client.sendAsync(
@@ -128,7 +148,7 @@ public class CopilotClientResponses extends CopilotClientBase<Pair<OAIResponsesR
             (failureReason) -> {
                 if (OpenAIConstants.LEGACY_FALLBACK.equals(failureReason)) {
                     try {
-                        backupClient.createChatCompletionStream(monitor, token, chatRequest.getSecond(), listener);
+                        backupClient.createChatCompletionStream(monitor, token, chatRequest.getSecond(), listener, apiBaseUrl);
                     } catch (DBException ex) {
                         log.error("Error in legacy client fallback", ex);
                         listener.error(ex);
@@ -137,7 +157,7 @@ public class CopilotClientResponses extends CopilotClientBase<Pair<OAIResponsesR
                     chatRequest.getFirst().temperature = null;
                     MODELS_WITHOUT_TEMPERATURE.add(chatRequest.getFirst().model);
                     try {
-                        createChatCompletionStream(monitor, token, chatRequest, listener);
+                        createChatCompletionStream(monitor, token, chatRequest, listener, apiBaseUrl);
                     } catch (DBException e) {
                         log.error("Error in client fallback", e);
                         listener.error(e);

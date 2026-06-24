@@ -16,6 +16,24 @@
  */
 package org.jkiss.dbeaver.model.ai.engine.copilot.dto;
 
+import org.jkiss.code.NotNull;
+import org.jkiss.code.Nullable;
+
+import java.util.Map;
+
 @SuppressWarnings("checkstyle:RecordComponentName")
-public record CopilotSessionToken(String token) {
+public record CopilotSessionToken(String token, @Nullable Map<String, String> endpoints) {
+
+    private static final String DEFAULT_API_BASE = "https://api.githubcopilot.com";
+
+    /**
+     * Returns the API base URL from the endpoints map, or the default if not present.
+     */
+    @NotNull
+    public String getApiBaseUrl() {
+        if (endpoints != null && endpoints.containsKey("api")) {
+            return endpoints.get("api");
+        }
+        return DEFAULT_API_BASE;
+    }
 }

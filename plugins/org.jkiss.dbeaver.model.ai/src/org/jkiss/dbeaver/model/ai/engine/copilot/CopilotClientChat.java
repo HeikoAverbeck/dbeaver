@@ -39,7 +39,7 @@ public class CopilotClientChat extends CopilotClientBase<CopilotChatRequest, Cop
     private static final String DATA_EVENT = "data: ";
     private static final String DONE_EVENT = "[DONE]";
 
-    private static final String CHAT_REQUEST_URL = "https://api.githubcopilot.com/chat/completions";
+    private static final String CHAT_COMPLETIONS_PATH = "/chat/completions";
 
     public CopilotClientChat(@NotNull String authProviderBaseURL) {
         super(authProviderBaseURL);
@@ -55,8 +55,18 @@ public class CopilotClientChat extends CopilotClientBase<CopilotChatRequest, Cop
         @NotNull String token,
         @NotNull CopilotChatRequest chatRequest
     ) throws DBException {
+        return chat(monitor, token, chatRequest, "https://api.githubcopilot.com");
+    }
+
+    @NotNull
+    public CopilotChatResponseLegacy chat(
+        @NotNull DBRProgressMonitor monitor,
+        @NotNull String token,
+        @NotNull CopilotChatRequest chatRequest,
+        @NotNull String apiBaseUrl
+    ) throws DBException {
         HttpRequest request = HttpRequest.newBuilder()
-            .uri(AIHttpUtils.resolve(CHAT_REQUEST_URL))
+            .uri(AIHttpUtils.resolve(apiBaseUrl + CHAT_COMPLETIONS_PATH))
             .header(HttpConstants.HEADER_CONTENT_TYPE, HttpConstants.CONTENT_TYPE_JSON)
             .header(HttpConstants.HEADER_AUTHORIZATION, "Bearer " + token)
             .header("Editor-Version", CHAT_EDITOR_VERSION)
@@ -75,8 +85,18 @@ public class CopilotClientChat extends CopilotClientBase<CopilotChatRequest, Cop
         @NotNull CopilotChatRequest chatRequest,
         @NotNull AIEngineResponseConsumer listener
     ) throws DBException {
+        createChatCompletionStream(monitor, token, chatRequest, listener, "https://api.githubcopilot.com");
+    }
+
+    public void createChatCompletionStream(
+        @NotNull DBRProgressMonitor monitor,
+        @NotNull String token,
+        @NotNull CopilotChatRequest chatRequest,
+        @NotNull AIEngineResponseConsumer listener,
+        @NotNull String apiBaseUrl
+    ) throws DBException {
         HttpRequest request = HttpRequest.newBuilder()
-            .uri(AIHttpUtils.resolve(CHAT_REQUEST_URL))
+            .uri(AIHttpUtils.resolve(apiBaseUrl + CHAT_COMPLETIONS_PATH))
             .header(HttpConstants.HEADER_CONTENT_TYPE, HttpConstants.CONTENT_TYPE_JSON)
             .header(HttpConstants.HEADER_AUTHORIZATION, "Bearer " + token)
             .header("Editor-Version", CHAT_EDITOR_VERSION)

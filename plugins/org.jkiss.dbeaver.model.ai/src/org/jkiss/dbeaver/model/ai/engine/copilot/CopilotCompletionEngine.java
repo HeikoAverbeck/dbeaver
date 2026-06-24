@@ -65,7 +65,8 @@ public class CopilotCompletionEngine<P extends CopilotProperties> extends BaseCo
     @NotNull
     @Override
     public List<AIModel> getModels(@NotNull DBRProgressMonitor monitor) throws DBException {
-        List<CopilotModel> copilotModels = client.getInstance().loadModels(monitor, requestSessionToken(monitor).token());
+        CopilotSessionToken token = requestSessionToken(monitor);
+        List<CopilotModel> copilotModels = client.getInstance().loadModels(monitor, token.token(), token.getApiBaseUrl());
         List<AIModel> list = new ArrayList<>();
         for (CopilotModel model : copilotModels) {
             AIModel aiModel = new AIModel(model.id(), null, Set.of(AIModelFeature.CHAT));
@@ -84,10 +85,12 @@ public class CopilotCompletionEngine<P extends CopilotProperties> extends BaseCo
             OpenAiUtils.createOpenAiRequest(request, getModelName(), getProperties().getTemperature()),
             createLegacyChatRequest(request, false)
         );
+        CopilotSessionToken token = requestSessionToken(monitor);
         Object chatResponse = client.getInstance().chat(
             monitor,
-            requestSessionToken(monitor).token(),
-            copilotChatRequestOAIResponsesRequestPair
+            token.token(),
+            copilotChatRequestOAIResponsesRequestPair,
+            token.getApiBaseUrl()
         );
         if (chatResponse instanceof OAIResponsesResponse oaiResponse) {
             return toEngineResponse(oaiResponse);
@@ -140,11 +143,13 @@ public class CopilotCompletionEngine<P extends CopilotProperties> extends BaseCo
             OpenAiUtils.createOpenAiRequest(request, getModelName(), getProperties().getTemperature()),
             createLegacyChatRequest(request, true)
         );
+        CopilotSessionToken token = requestSessionToken(monitor);
         client.getInstance().createChatCompletionStream(
             monitor,
-            requestSessionToken(monitor).token(),
+            token.token(),
             copilotChatRequestOAIResponsesRequestPair,
-            listener
+            listener,
+            token.getApiBaseUrl()
         );
     }
 
